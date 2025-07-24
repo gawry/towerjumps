@@ -1,0 +1,31 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      eventsource-client:
+        specifier: ^1.1.4
+        version: 1.1.4
+
+packages:
+
+  eventsource-client@1.1.4:
+    resolution: {integrity: sha512-CKnqZTwXCnHN2EqrEB9eLSjMMRqHum09VOsikkgSPoa2Jr2XgQnX7P1Fxhnnj/UHxi3GQ2xVsXDKIktEes07bg==}
+    engines: {node: '>=18.0.0'}
+
+  eventsource-parser@3.0.3:
+    resolution: {integrity: sha512-nVpZkTMM9rF6AQ9gPJpFsNAMt48wIzB5TQgiTLdHiuO8XEDhUgZEhqKlZWXbIzo9VmJ/HvysHqEaVeD5v9TPvA==}
+    engines: {node: '>=20.0.0'}
+
+snapshots:
+
+  eventsource-client@1.1.4:
+    dependencies:
+      eventsource-parser: 3.0.3
+
+  eventsource-parser@3.0.3: {}

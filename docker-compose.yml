@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+    environment:
+      - PYTHONPATH=/app/src
+    command: ["uv", "run", "towerjumps-api", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    networks:
+      - towerjumps-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://0.0.0.0:8001
+    command: ["pnpm", "dev", "--host", "0.0.0.0"]
+    depends_on:
+      - backend
+    networks:
+      - towerjumps-network
+
+networks:
+  towerjumps-network:
+    driver: bridge
