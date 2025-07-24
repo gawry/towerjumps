@@ -13,6 +13,7 @@ interface EventsLogProps {
 export const EventsLog = React.memo(function EventsLog({ events, isAnalyzing }: EventsLogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
+  const eventSizes = useRef<number[]>([]);
 
   // Memoize latest event preview to avoid recalculation
   const latestEventPreview = useMemo(() => {
@@ -25,12 +26,32 @@ export const EventsLog = React.memo(function EventsLog({ events, isAnalyzing }: 
     };
   }, [events]);
 
-  // Set up virtualizer
+  // Initialize event sizes when events change
+  useEffect(() => {
+    // Ensure we have size entries for all events
+    while (eventSizes.current.length < events.length) {
+      eventSizes.current.push(160); // Default size for new events
+    }
+    // Trim if we have fewer events
+    if (eventSizes.current.length > events.length) {
+      eventSizes.current = eventSizes.current.slice(0, events.length);
+    }
+  }, [events.length]);
+
+  // Set up virtualizer with size state management
   const virtualizer = useVirtualizer({
     count: events.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 130, // Estimated height of each EventItem
-    overscan: 5, // Render 5 extra items above and below viewport
+    estimateSize: (index) => eventSizes.current[index] || 120,
+    overscan: 2, // Reduced overscan for better performance
+    measureElement: (element) => {
+      // Get the index from the data-index attribute
+      const index = parseInt(element?.getAttribute('data-index') || '0');
+      // Measure the actual height and store it
+      const height = element?.getBoundingClientRect().height ?? 120;
+      eventSizes.current[index] = height;
+      return height;
+    },
   });
 
   // Auto-scroll to bottom when new events arrive and list is expanded
@@ -109,6 +130,7 @@ export const EventsLog = React.memo(function EventsLog({ events, isAnalyzing }: 
                 return (
                   <div
                     key={virtualItem.key}
+                    data-index={virtualItem.index}
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -117,7 +139,7 @@ export const EventsLog = React.memo(function EventsLog({ events, isAnalyzing }: 
                       height: `${virtualItem.size}px`,
                       transform: `translateY(${virtualItem.start}px)`,
                     }}
-                    className="px-2 py-1"
+                    className="px-2 py-2"
                   >
                     <EventItem
                       event={event}
