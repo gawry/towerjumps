@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: towerjumps-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: uv sync --frozen && uv cache prune --ci
+    startCommand: uv run towerjumps-api --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+
+  - type: web
+    name: towerjumps-frontend
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && pnpm install && pnpm build
+    staticPublishPath: frontend/build/client
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: towerjumps-backend
+          property: host
