@@ -12,11 +12,11 @@ services:
 
   - type: web
     name: towerjumps-frontend
-    env: static
+    env: node
     region: oregon
     plan: free
     buildCommand: cd frontend && pnpm install && pnpm build
-    staticPublishPath: frontend/build/client
+    startCommand: cd frontend && pnpm start
     envVars:
       - key: VITE_API_BASE_URL
         fromService:
