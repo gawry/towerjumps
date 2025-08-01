@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     buildCommand: uv sync --frozen && uv cache prune --ci
-    startCommand: uv run towerjumps-api --host 0.0.0.0 --port $PORT
+    startCommand: uv run towerjumps-api --host 0.0.0.0
     envVars:
       - key: PYTHONPATH
         value: /opt/render/project/src

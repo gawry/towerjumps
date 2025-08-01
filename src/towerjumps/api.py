@@ -191,6 +191,25 @@ def run_server(host: str = "127.0.0.1", port: int = 8001, reload: bool = True):
     uvicorn.run("towerjumps.api:app", host=host, port=port, reload=reload, log_level="debug")
 
 
+def main():
+    """CLI entry point for the Tower Jumps Analysis API server."""
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description="Tower Jumps Analysis API Server")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
+    parser.add_argument("--port", "-p", type=int, default=8001, help="Port to bind to")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+
+    args = parser.parse_args()
+
+    # Support environment variables for deployment
+    host = os.getenv("HOST", args.host)
+    port = int(os.getenv("PORT", args.port))
+    reload = args.reload
+
+    run_server(host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
-    logger.info("Starting Tower Jumps Analysis API server")
-    run_server(reload=True)
+    main()

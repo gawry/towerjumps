@@ -32,7 +32,7 @@ dependencies = [
 
 [project.scripts]
 towerjumps = "towerjumps.cli:main"
-towerjumps-api = "towerjumps.api:run_server"
+towerjumps-api = "towerjumps.api:main"
 
 [project.urls]
 Homepage = "https://gawry.github.io/towerjumps/"
