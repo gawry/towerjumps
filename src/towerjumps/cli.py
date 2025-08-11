@@ -410,22 +410,22 @@ def analyze(
             SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, disable=quiet
         ) as progress:
             load_task = progress.add_task("📂 Loading data...", total=None)
-            records = load_csv_data(str(input_file))
+            df = load_csv_data(str(input_file))
             progress.remove_task(load_task)
 
             validate_task = progress.add_task("✅ Validating data...", total=None)
-            stats = validate_data(records)
+            stats = validate_data(df)
             progress.remove_task(validate_task)
 
             if not quiet:
                 print_rich_data_summary(stats)
 
-            if not records:
+            if df.empty:
                 console.print("[red]❌ No valid records found in input file.[/red]")
                 _exit_with_error()
 
         processor = AnalysisEventProcessor(console, quiet)
-        intervals = processor.process_stream(records, config)
+        intervals = processor.process_stream(df, config)
 
         if not intervals:
             console.print("[red]❌ No time intervals generated from analysis.[/red]")

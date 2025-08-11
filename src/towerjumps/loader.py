@@ -25,7 +25,7 @@ class CsvReadError(Exception):
         self.original_error = original_error
 
 
-def load_csv_data(file_path: str) -> list[LocationRecord]:
+def load_csv_data(file_path: str) -> pd.DataFrame:
     file_path = Path(file_path)
     if not file_path.exists():
         raise DataLoadError(file_path)
@@ -72,6 +72,24 @@ def load_csv_data(file_path: str) -> list[LocationRecord]:
 
         df_valid["CellType"] = df_valid["CellType"].fillna("Unknown")
 
+        # Rename columns to match internal naming convention
+        df_valid = df_valid.rename(
+            columns={
+                "Page": "page",
+                "Item": "item",
+                "UTCDateTime": "utc_datetime",
+                "LocalDateTime": "local_datetime",
+                "Latitude": "latitude",
+                "Longitude": "longitude",
+                "TimeZone": "timezone",
+                "City": "city",
+                "County": "county",
+                "State": "state",
+                "Country": "country",
+                "CellType": "cell_type",
+            }
+        )
+
         skipped_rows = len(df) - len(df_valid)
 
         logger.info(
@@ -88,12 +106,13 @@ def load_csv_data(file_path: str) -> list[LocationRecord]:
                 reason="parsing_errors",
                 file_path=str(file_path),
             )
-
-        logger.debug("Converting DataFrame to LocationRecord objects", record_count=len(df_valid))
-        return dataframe_to_records(df_valid)
+        else:
+            logger.debug("DataFrame processing completed", record_count=len(df_valid))
 
     except Exception as e:
         raise CsvReadError(e) from e
+
+    return df_valid
 
 
 def dataframe_to_records(df: pd.DataFrame) -> list[LocationRecord]:
@@ -129,11 +148,11 @@ def dataframe_to_records(df: pd.DataFrame) -> list[LocationRecord]:
     return records
 
 
-def validate_data(records: list[LocationRecord]) -> dict[str, any]:
-    logger.debug("Starting data validation", total_records=len(records))
+def validate_data(df: pd.DataFrame) -> dict[str, any]:
+    logger.debug("Starting data validation", total_records=len(df))
 
     stats = {
-        "total_records": len(records),
+        "total_records": len(df),
         "records_with_location": 0,
         "records_without_location": 0,
         "unique_states": set(),
@@ -141,34 +160,32 @@ def validate_data(records: list[LocationRecord]) -> dict[str, any]:
         "cell_types": set(),
     }
 
-    if not records:
+    if df.empty:
         logger.warning("No records provided for validation")
         return stats
 
-    # Calculate statistics
-    dates = []
-    for i, record in enumerate(records, 1):
-        if i % 5000 == 0:
-            logger.debug(
-                "Validation progress",
-                processed_records=i,
-                total_records=len(records),
-                progress_pct=round((i / len(records)) * 100, 1),
-            )
-        if record.has_location:
-            stats["records_with_location"] += 1
-        else:
-            stats["records_without_location"] += 1
+    # Calculate statistics using vectorized operations
+    has_location_mask = (
+        df["latitude"].notna() & df["longitude"].notna() & (df["latitude"] != 0) & (df["longitude"] != 0)
+    )
 
-        if record.state:
-            stats["unique_states"].add(record.state)
+    stats["records_with_location"] = has_location_mask.sum()
+    stats["records_without_location"] = len(df) - stats["records_with_location"]
 
-        stats["cell_types"].add(record.cell_type)
-        dates.append(record.utc_datetime)
+    # Collect unique states (excluding NaN)
+    unique_states = df["state"].dropna().unique()
+    stats["unique_states"] = set(unique_states)
 
-    if dates:
-        dates.sort()
-        stats["date_range"] = (dates[0], dates[-1])
+    # Collect unique cell types (excluding NaN)
+    unique_cell_types = df["cell_type"].dropna().unique()
+    stats["cell_types"] = set(unique_cell_types)
+
+    # Get date range
+    if "utc_datetime" in df.columns and not df["utc_datetime"].empty:
+        min_date = df["utc_datetime"].min()
+        max_date = df["utc_datetime"].max()
+        if pd.notna(min_date) and pd.notna(max_date):
+            stats["date_range"] = (min_date, max_date)
 
     logger.info(
         "Data validation completed",

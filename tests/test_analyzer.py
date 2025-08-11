@@ -34,7 +34,7 @@ from towerjumps.events import (
     ProcessingEvent,
     WindowCreationEvent,
 )
-from towerjumps.models import LocationRecord, TimeInterval
+from towerjumps.models import TimeInterval
 
 
 @pytest.fixture
@@ -54,93 +54,95 @@ def sample_config():
 
 
 @pytest.fixture
-def sample_location_records():
-    """Sample location records for testing."""
-    base_time = datetime(2023, 1, 1, 12, 0, 0)
-    return [
-        LocationRecord(
-            page=1,
-            item=1,
-            utc_datetime=base_time,
-            local_datetime=base_time,
-            latitude=40.7128,
-            longitude=-74.0060,
-            timezone="UTC",
-            city="New York",
-            county="New York",
-            state="NY",
-            country="US",
-            cell_type="4G",
-        ),
-        LocationRecord(
-            page=1,
-            item=2,
-            utc_datetime=base_time + timedelta(minutes=5),
-            local_datetime=base_time + timedelta(minutes=5),
-            latitude=40.7589,
-            longitude=-73.9851,
-            timezone="UTC",
-            city="New York",
-            county="New York",
-            state="NY",
-            country="US",
-            cell_type="4G",
-        ),
-        LocationRecord(
-            page=1,
-            item=3,
-            utc_datetime=base_time + timedelta(minutes=10),
-            local_datetime=base_time + timedelta(minutes=10),
-            latitude=34.0522,
-            longitude=-118.2437,
-            timezone="UTC",
-            city="Los Angeles",
-            county="Los Angeles",
-            state="CA",
-            country="US",
-            cell_type="4G",
-        ),
-    ]
-
-
-@pytest.fixture
-def sample_location_records_no_location():
-    """Sample location records without valid location data."""
-    base_time = datetime(2023, 1, 1, 12, 0, 0)
-    return [
-        LocationRecord(
-            page=1,
-            item=1,
-            utc_datetime=base_time,
-            local_datetime=base_time,
-            latitude=None,
-            longitude=None,
-            timezone="UTC",
-            city="Unknown",
-            county="Unknown",
-            state="Unknown",
-            country="US",
-            cell_type="4G",
-        ),
-        LocationRecord(
-            page=1,
-            item=2,
-            utc_datetime=base_time + timedelta(minutes=5),
-            local_datetime=base_time + timedelta(minutes=5),
-            latitude=0.0,
-            longitude=0.0,
-            timezone="UTC",
-            city="Unknown",
-            county="Unknown",
-            state="Unknown",
-            country="US",
-            cell_type="4G",
-        ),
-    ]
-
-
-@pytest.fixture
 def sample_dataframe():
+    """Sample DataFrame for testing."""
+    base_time = datetime(2023, 1, 1, 12, 0, 0)
+    data = [
+        {
+            "page": 1,
+            "item": 1,
+            "utc_datetime": base_time,
+            "local_datetime": base_time,
+            "latitude": 40.7128,
+            "longitude": -74.0060,
+            "timezone": "UTC",
+            "city": "New York",
+            "county": "New York",
+            "state": "NY",
+            "country": "US",
+            "cell_type": "4G",
+        },
+        {
+            "page": 1,
+            "item": 2,
+            "utc_datetime": base_time + timedelta(minutes=5),
+            "local_datetime": base_time + timedelta(minutes=5),
+            "latitude": 40.7589,
+            "longitude": -73.9851,
+            "timezone": "UTC",
+            "city": "New York",
+            "county": "New York",
+            "state": "NY",
+            "country": "US",
+            "cell_type": "4G",
+        },
+        {
+            "page": 1,
+            "item": 3,
+            "utc_datetime": base_time + timedelta(minutes=10),
+            "local_datetime": base_time + timedelta(minutes=10),
+            "latitude": 34.0522,
+            "longitude": -118.2437,
+            "timezone": "UTC",
+            "city": "Los Angeles",
+            "county": "Los Angeles",
+            "state": "CA",
+            "country": "US",
+            "cell_type": "4G",
+        },
+    ]
+    return pd.DataFrame(data)
+
+
+@pytest.fixture
+def sample_dataframe_no_location():
+    """Sample DataFrame without valid location data."""
+    base_time = datetime(2023, 1, 1, 12, 0, 0)
+    data = [
+        {
+            "page": 1,
+            "item": 1,
+            "utc_datetime": base_time,
+            "local_datetime": base_time,
+            "latitude": None,
+            "longitude": None,
+            "timezone": "UTC",
+            "city": "Unknown",
+            "county": "Unknown",
+            "state": "Unknown",
+            "country": "US",
+            "cell_type": "4G",
+        },
+        {
+            "page": 1,
+            "item": 2,
+            "utc_datetime": base_time + timedelta(minutes=5),
+            "local_datetime": base_time + timedelta(minutes=5),
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "timezone": "UTC",
+            "city": "Unknown",
+            "county": "Unknown",
+            "state": "Unknown",
+            "country": "US",
+            "cell_type": "4G",
+        },
+    ]
+    return pd.DataFrame(data)
+
+
+@pytest.fixture
+def sample_window_dataframe():
     """Sample DataFrame for window analysis tests."""
     base_time = datetime(2023, 1, 1, 12, 0, 0)
     data = {
@@ -203,28 +205,25 @@ def sample_intervals():
 class TestAnalyzeTowerJumps:
     """Test the main analyze_tower_jumps function."""
 
-    @patch("towerjumps.analyzer.filter_records_with_location")
-    @patch("towerjumps.analyzer.records_to_dataframe")
+    @patch("towerjumps.analyzer.filter_dataframe_with_location")
     @patch("towerjumps.analyzer.add_distances_and_speeds")
     @patch("towerjumps.analyzer.add_anomaly_detection")
-    @patch("towerjumps.analyzer.create_data_driven_time_windows")
+    @patch("towerjumps.analyzer.create_time_windows")
     def test_analyze_tower_jumps_success(
         self,
         mock_windows,
         mock_anomaly,
         mock_distances,
-        mock_dataframe,
         mock_filter,
-        sample_location_records,
-        sample_config,
         sample_dataframe,
+        sample_config,
+        sample_window_dataframe,
     ):
         """Test successful analysis flow."""
         # Setup mocks
-        mock_filter.return_value = sample_location_records
-        mock_dataframe.return_value = sample_dataframe
-        mock_distances.return_value = sample_dataframe
-        mock_anomaly.return_value = sample_dataframe
+        mock_filter.return_value = sample_dataframe
+        mock_distances.return_value = sample_window_dataframe
+        mock_anomaly.return_value = sample_window_dataframe
 
         base_time = datetime(2023, 1, 1, 12, 0, 0)
         mock_windows.return_value = [
@@ -233,7 +232,7 @@ class TestAnalyzeTowerJumps:
         ]
 
         # Run analysis
-        events = list(analyze_tower_jumps(sample_location_records, sample_config))
+        events = list(analyze_tower_jumps(sample_dataframe, sample_config))
 
         # Extract final result
         completion_events = [e for e in events if isinstance(e, CompletionEvent)]
@@ -248,9 +247,9 @@ class TestAnalyzeTowerJumps:
         assert any(isinstance(e, WindowCreationEvent) for e in events)
         assert any(isinstance(e, CompletionEvent) for e in events)
 
-    def test_analyze_tower_jumps_no_location_data(self, sample_location_records_no_location, sample_config):
+    def test_analyze_tower_jumps_no_location_data(self, sample_dataframe_no_location, sample_config):
         """Test analysis with no valid location data."""
-        events = list(analyze_tower_jumps(sample_location_records_no_location, sample_config))
+        events = list(analyze_tower_jumps(sample_dataframe_no_location, sample_config))
 
         # Should get error event for no location data
         error_events = [e for e in events if isinstance(e, ErrorEvent)]
@@ -258,20 +257,21 @@ class TestAnalyzeTowerJumps:
         assert "No records with location data found" in error_events[0].message
 
     def test_analyze_tower_jumps_empty_records(self, sample_config):
-        """Test analysis with empty records list."""
-        events = list(analyze_tower_jumps([], sample_config))
+        """Test analysis with empty DataFrame."""
+        empty_df = pd.DataFrame()
+        events = list(analyze_tower_jumps(empty_df, sample_config))
 
         # Should get error event for no data
         error_events = [e for e in events if isinstance(e, ErrorEvent)]
         assert len(error_events) > 0
 
-    @patch("towerjumps.analyzer.filter_records_with_location")
-    def test_analyze_tower_jumps_exception_handling(self, mock_filter, sample_location_records, sample_config):
+    @patch("towerjumps.analyzer.filter_dataframe_with_location")
+    def test_analyze_tower_jumps_exception_handling(self, mock_filter, sample_dataframe, sample_config):
         """Test that exceptions are properly handled and reported."""
-        # Make filter_records_with_location raise an exception
+        # Make filter_dataframe_with_location raise an exception
         mock_filter.side_effect = ValueError("Test exception")
 
-        events = list(analyze_tower_jumps(sample_location_records, sample_config))
+        events = list(analyze_tower_jumps(sample_dataframe, sample_config))
 
         # Should get error event
         error_events = [e for e in events if isinstance(e, ErrorEvent)]
@@ -283,7 +283,7 @@ class TestAnalyzeTowerJumpsStream:
     """Test the streaming async version of tower jumps analysis."""
 
     @pytest.mark.asyncio
-    async def test_analyze_tower_jumps_stream_success(self, sample_location_records, sample_config):
+    async def test_analyze_tower_jumps_stream_success(self, sample_dataframe, sample_config):
         """Test successful streaming async analysis."""
 
         # Create a generator function that yields events and returns result
@@ -295,7 +295,7 @@ class TestAnalyzeTowerJumpsStream:
         with patch("towerjumps.analyzer.analyze_tower_jumps", return_value=mock_generator()):
             # Collect events from the async generator
             events = []
-            async for event in analyze_tower_jumps_stream(sample_location_records, sample_config):
+            async for event in analyze_tower_jumps_stream(sample_dataframe, sample_config):
                 events.append(event)
 
             # Verify we received events
@@ -304,7 +304,7 @@ class TestAnalyzeTowerJumpsStream:
             assert any(isinstance(e, CompletionEvent) for e in events)
 
     @pytest.mark.asyncio
-    async def test_analyze_tower_jumps_stream_exception(self, sample_location_records, sample_config):
+    async def test_analyze_tower_jumps_stream_exception(self, sample_dataframe, sample_config):
         """Test streaming async analysis exception handling."""
 
         with patch("towerjumps.analyzer.analyze_tower_jumps") as mock_analyze:
@@ -312,7 +312,7 @@ class TestAnalyzeTowerJumpsStream:
 
             # Collect events from the async generator
             events = []
-            async for event in analyze_tower_jumps_stream(sample_location_records, sample_config):
+            async for event in analyze_tower_jumps_stream(sample_dataframe, sample_config):
                 events.append(event)
 
             # Should get error event
@@ -324,12 +324,12 @@ class TestAnalyzeTowerJumpsStream:
 class TestAnalyzeTimeWindow:
     """Test the analyze_time_window function."""
 
-    def test_analyze_time_window_success(self, sample_dataframe, sample_config):
+    def test_analyze_time_window_success(self, sample_window_dataframe, sample_config):
         """Test successful time window analysis."""
         start_time = datetime(2023, 1, 1, 12, 0, 0)
         end_time = start_time + timedelta(minutes=15)
 
-        interval = analyze_time_window(sample_dataframe, start_time, end_time, sample_config)
+        interval = analyze_time_window(sample_window_dataframe, start_time, end_time, sample_config)
 
         assert isinstance(interval, TimeInterval)
         assert interval.start_time == start_time
@@ -621,28 +621,25 @@ class TestGenerateAnalysisSummary:
 class TestIntegration:
     """Integration tests combining multiple functions."""
 
-    @patch("towerjumps.analyzer.filter_records_with_location")
-    @patch("towerjumps.analyzer.records_to_dataframe")
+    @patch("towerjumps.analyzer.filter_dataframe_with_location")
     @patch("towerjumps.analyzer.add_distances_and_speeds")
     @patch("towerjumps.analyzer.add_anomaly_detection")
-    @patch("towerjumps.analyzer.create_data_driven_time_windows")
+    @patch("towerjumps.analyzer.create_time_windows")
     def test_full_analysis_pipeline(
         self,
         mock_windows,
         mock_anomaly,
         mock_distances,
-        mock_dataframe,
         mock_filter,
-        sample_location_records,
-        sample_config,
         sample_dataframe,
+        sample_config,
+        sample_window_dataframe,
     ):
         """Test the complete analysis pipeline end-to-end."""
         # Setup mocks
-        mock_filter.return_value = sample_location_records
-        mock_dataframe.return_value = sample_dataframe
-        mock_distances.return_value = sample_dataframe
-        mock_anomaly.return_value = sample_dataframe
+        mock_filter.return_value = sample_dataframe
+        mock_distances.return_value = sample_window_dataframe
+        mock_anomaly.return_value = sample_window_dataframe
 
         base_time = datetime(2023, 1, 1, 12, 0, 0)
         mock_windows.return_value = [
@@ -650,7 +647,7 @@ class TestIntegration:
         ]
 
         # Run analysis
-        events = list(analyze_tower_jumps(sample_location_records, sample_config))
+        events = list(analyze_tower_jumps(sample_dataframe, sample_config))
 
         # Verify we get expected event types
         event_types = [type(e).__name__ for e in events]

@@ -18,24 +18,21 @@ from towerjumps.events import (
     ProcessingEvent,
     WindowCreationEvent,
 )
-from towerjumps.models import LocationRecord, TimeInterval
+from towerjumps.models import TimeInterval
 from towerjumps.utils import (
     add_anomaly_detection,
     add_distances_and_speeds,
-    create_data_driven_time_windows,
-    filter_records_with_location,
-    records_to_dataframe,
+    create_time_windows,
+    filter_dataframe_with_location,
 )
 
 logger = structlog.get_logger(__name__)
 
 
-def analyze_tower_jumps(
-    records: list[LocationRecord], config: Config
-) -> Generator[AnalysisEventType, None, list[TimeInterval]]:
+def analyze_tower_jumps(df: pd.DataFrame, config: Config) -> Generator[AnalysisEventType, None, list[TimeInterval]]:
     logger.info(
         "Starting tower jumps analysis",
-        total_records=len(records),
+        total_records=len(df),
         time_window_minutes=config.time_window_minutes,
         max_speed_mph=config.max_speed_mph,
         confidence_threshold=config.min_confidence_threshold,
@@ -44,13 +41,13 @@ def analyze_tower_jumps(
     intervals = []
 
     try:
-        logger.debug("Step 1: Starting data filtering", total_records=len(records))
+        logger.debug("Step 1: Starting data filtering", total_records=len(df))
         yield DataLoadingEvent("Starting data filtering...")
 
-        location_records = filter_records_with_location(records)
+        location_df = filter_dataframe_with_location(df)
 
-        if not location_records:
-            logger.error("No records with location data found", total_records=len(records), records_with_location=0)
+        if location_df.empty:
+            logger.error("No records with location data found", total_records=len(df), records_with_location=0)
             yield ErrorEvent(
                 "No records with location data found",
                 "DATA_ERROR",
@@ -60,31 +57,19 @@ def analyze_tower_jumps(
 
         logger.info(
             "Data filtering completed",
-            total_records=len(records),
-            records_with_location=len(location_records),
-            filter_efficiency=f"{(len(location_records) / len(records) * 100):.1f}%",
+            total_records=len(df),
+            records_with_location=len(location_df),
+            filter_efficiency=f"{(len(location_df) / len(df) * 100):.1f}%",
         )
 
         yield DataLoadingEvent(
-            "Data filtering completed", total_records=len(records), records_with_location=len(location_records)
+            "Data filtering completed", total_records=len(df), records_with_location=len(location_df)
         )
 
-        logger.debug("Step 2: Converting records to DataFrame", record_count=len(location_records))
-        yield ProcessingEvent("Converting records to DataFrame...", "dataframe_conversion")
-
-        df = records_to_dataframe(location_records)
-
-        logger.debug(
-            "DataFrame conversion completed",
-            dataframe_shape=df.shape,
-            memory_usage_mb=round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2),
-        )
-        yield ProcessingEvent("DataFrame conversion completed", "dataframe_conversion", 100.0)
-
-        logger.debug("Step 3: Calculating distances and speeds", record_count=len(df))
+        logger.debug("Step 2: Calculating distances and speeds", record_count=len(location_df))
         yield ProcessingEvent("Calculating distances and speeds...", "distance_calculation")
 
-        df_with_metrics = add_distances_and_speeds(df)
+        df_with_metrics = add_distances_and_speeds(location_df)
 
         logger.debug(
             "Distance and speed calculation completed",
@@ -94,7 +79,7 @@ def analyze_tower_jumps(
         yield ProcessingEvent("Distance and speed calculation completed", "distance_calculation", 100.0)
 
         logger.debug(
-            "Step 4: Detecting movement anomalies",
+            "Step 3: Detecting movement anomalies",
             max_speed_threshold_kmh=config.max_speed_kmh,
             min_distance_threshold_km=config.min_tower_jump_distance_km,
         )
@@ -112,7 +97,7 @@ def analyze_tower_jumps(
         yield ProcessingEvent("Anomaly detection completed", "anomaly_detection", 100.0)
 
         logger.debug(
-            "Step 5: Creating time windows",
+            "Step 4: Creating time windows",
             window_size_minutes=config.time_window_minutes,
             data_timespan_hours=round(
                 (df_final["utc_datetime"].max() - df_final["utc_datetime"].min()).total_seconds() / 3600, 1
@@ -120,7 +105,7 @@ def analyze_tower_jumps(
         )
         yield ProcessingEvent("Creating time windows...", "window_creation")
 
-        windows = create_data_driven_time_windows(df_final, config.time_window_minutes)
+        windows = create_time_windows(df_final, config.time_window_minutes)
 
         logger.info(
             "Time windows created",
@@ -134,7 +119,7 @@ def analyze_tower_jumps(
             window_size_minutes=config.time_window_minutes,
         )
 
-        logger.debug("Step 6: Starting window analysis", total_windows=len(windows))
+        logger.debug("Step 5: Starting window analysis", total_windows=len(windows))
         total_windows = len(windows)
         tower_jumps_detected = 0
 
@@ -193,7 +178,7 @@ def analyze_tower_jumps(
                 )
 
         logger.debug(
-            "Step 7: Generating final summary",
+            "Step 6: Generating final summary",
             total_intervals=len(intervals),
             tower_jumps_detected=tower_jumps_detected,
         )
@@ -206,7 +191,7 @@ def analyze_tower_jumps(
             tower_jump_percentage=summary.get("tower_jump_percentage", 0),
             most_common_state=summary.get("most_common_state", "Unknown"),
             average_confidence=round(summary.get("average_confidence", 0) * 100, 1),
-            processing_efficiency=f"Processed {len(windows)} windows from {len(records)} records",
+            processing_efficiency=f"Processed {len(windows)} windows from {len(df)} records",
         )
 
         yield CompletionEvent(
@@ -220,7 +205,7 @@ def analyze_tower_jumps(
         logger.exception(
             "Analysis failed with exception",
             intervals_processed=len(intervals),
-            total_records=len(records),
+            total_records=len(df),
         )
         yield ErrorEvent(f"Analysis failed: {e!s}", error_type=type(e).__name__, error_details=str(e))
         return []
@@ -228,19 +213,17 @@ def analyze_tower_jumps(
     return intervals
 
 
-async def analyze_tower_jumps_stream(
-    records: list[LocationRecord], config: Config
-) -> Generator[AnalysisEventType, None, None]:
+async def analyze_tower_jumps_stream(df: pd.DataFrame, config: Config):
     logger.info(
         "Starting true streaming tower jumps analysis",
-        total_records=len(records),
+        total_records=len(df),
         time_window_minutes=config.time_window_minutes,
         max_speed_mph=config.max_speed_mph,
         confidence_threshold=config.min_confidence_threshold,
     )
 
     try:
-        generator = analyze_tower_jumps(records, config)
+        generator = analyze_tower_jumps(df, config)
 
         async_next = sync_to_async(next, thread_sensitive=False)
 

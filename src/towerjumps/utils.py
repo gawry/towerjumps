@@ -3,8 +3,6 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
-from towerjumps.models import LocationRecord
-
 
 def haversine_distance(lat1: np.ndarray, lon1: np.ndarray, lat2: np.ndarray, lon2: np.ndarray) -> np.ndarray:
     """
@@ -61,7 +59,7 @@ def add_distances_and_speeds(df: pd.DataFrame) -> pd.DataFrame:
     return result_df.assign(distance_km=distances, time_diff_hours=time_diffs, speed_kmh=speeds)
 
 
-def create_data_driven_time_windows(df: pd.DataFrame, window_minutes: int) -> list[tuple[datetime, datetime]]:
+def create_time_windows(df: pd.DataFrame, window_minutes: int) -> list[tuple[datetime, datetime]]:
     if df.empty:
         return []
 
@@ -78,29 +76,15 @@ def create_data_driven_time_windows(df: pd.DataFrame, window_minutes: int) -> li
     return windows
 
 
-def filter_records_with_location(records: list[LocationRecord]) -> list[LocationRecord]:
-    return [record for record in records if record.has_location]
-
-
-def records_to_dataframe(records: list[LocationRecord]) -> pd.DataFrame:
-    data = []
-    for record in records:
-        data.append({
-            "page": record.page,
-            "item": record.item,
-            "utc_datetime": record.utc_datetime,
-            "local_datetime": record.local_datetime,
-            "latitude": record.latitude,
-            "longitude": record.longitude,
-            "timezone": record.timezone,
-            "city": record.city,
-            "county": record.county,
-            "state": record.state,
-            "country": record.country,
-            "cell_type": record.cell_type,
-        })
-
-    return pd.DataFrame(data)
+def filter_dataframe_with_location(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Filter DataFrame to include only records with valid location data.
+    Equivalent to LocationRecord.has_location property check.
+    """
+    has_location_mask = (
+        df["latitude"].notna() & df["longitude"].notna() & (df["latitude"] != 0) & (df["longitude"] != 0)
+    )
+    return df[has_location_mask].copy()
 
 
 def add_anomaly_detection(df: pd.DataFrame, max_speed_kmh: float, min_distance_km: float) -> pd.DataFrame:

@@ -118,15 +118,15 @@ async def analyze(
             try:
                 # Load data
                 logger.debug("Loading data from temporary file", temp_file_path=temp_file_path)
-                records = load_csv_data(temp_file_path)
+                df = load_csv_data(temp_file_path)
 
                 logger.info(
-                    "Starting simplified streaming analysis", record_count=len(records), temp_file_path=temp_file_path
+                    "Starting simplified streaming analysis", record_count=len(df), temp_file_path=temp_file_path
                 )
 
                 # Use the simplified streaming approach
                 event_count = 0
-                async for event in analyze_tower_jumps_stream(records, config):
+                async for event in analyze_tower_jumps_stream(df, config):
                     event_count += 1
                     event_data = event.to_dict()
 
