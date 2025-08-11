@@ -3,8 +3,6 @@ from pathlib import Path
 import pandas as pd
 import structlog
 
-from towerjumps.models import LocationRecord
-
 # Configure structured logging
 logger = structlog.get_logger(__name__)
 
@@ -113,39 +111,6 @@ def load_csv_data(file_path: str) -> pd.DataFrame:
         raise CsvReadError(e) from e
 
     return df_valid
-
-
-def dataframe_to_records(df: pd.DataFrame) -> list[LocationRecord]:
-    logger.debug("Starting DataFrame to LocationRecord conversion", total_rows=len(df))
-
-    records = []
-
-    for i, row in enumerate(df.itertuples(index=False), 1):
-        if i % 1000 == 0:
-            logger.debug(
-                "DataFrame conversion progress",
-                processed_rows=i,
-                total_rows=len(df),
-                progress_pct=round((i / len(df)) * 100, 1),
-            )
-        record = LocationRecord(
-            page=int(row.Page) if pd.notna(row.Page) else 0,
-            item=int(row.Item) if pd.notna(row.Item) else 0,
-            utc_datetime=row.UTCDateTime,
-            local_datetime=row.LocalDateTime,
-            latitude=row.Latitude if pd.notna(row.Latitude) else None,
-            longitude=row.Longitude if pd.notna(row.Longitude) else None,
-            timezone=row.TimeZone if pd.notna(row.TimeZone) else None,
-            city=row.City if pd.notna(row.City) else None,
-            county=row.County if pd.notna(row.County) else None,
-            state=row.State if pd.notna(row.State) else None,
-            country=row.Country if pd.notna(row.Country) else None,
-            cell_type=row.CellType if pd.notna(row.CellType) else "Unknown",
-        )
-        records.append(record)
-
-    logger.debug("DataFrame to LocationRecord conversion completed", total_records=len(records))
-    return records
 
 
 def validate_data(df: pd.DataFrame) -> dict[str, any]:

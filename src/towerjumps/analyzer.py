@@ -29,6 +29,19 @@ from towerjumps.utils import (
 logger = structlog.get_logger(__name__)
 
 
+# Internal sentinel and helper to safely advance a generator in a worker thread
+_STREAM_SENTINEL = object()
+
+
+def _next_with_stop(iterable):
+    """Advance iterator one step. On completion, return (sentinel, final_value) instead of raising StopIteration."""
+    try:
+        return next(iterable)
+    except StopIteration as e:
+        # Preserve the generator's return value for logging/metrics
+        return (_STREAM_SENTINEL, getattr(e, "value", None))
+
+
 def analyze_tower_jumps(df: pd.DataFrame, config: Config) -> Generator[AnalysisEventType, None, list[TimeInterval]]:
     logger.info(
         "Starting tower jumps analysis",
@@ -225,17 +238,22 @@ async def analyze_tower_jumps_stream(df: pd.DataFrame, config: Config):
     try:
         generator = analyze_tower_jumps(df, config)
 
-        async_next = sync_to_async(next, thread_sensitive=False)
+        async_next = sync_to_async(_next_with_stop, thread_sensitive=False)
 
         while True:
-            try:
-                event = await async_next(generator)
-                yield event
-                await asyncio.sleep(0)
-
-            except StopIteration as e:
-                logger.info("True streaming analysis completed", final_result_count=len(e.value) if e.value else 0)
+            result = await async_next(generator)
+            # Completion case: thread caught StopIteration
+            if isinstance(result, tuple) and result and result[0] is _STREAM_SENTINEL:
+                final_value = result[1]
+                logger.info(
+                    "True streaming analysis completed",
+                    final_result_count=len(final_value) if final_value else 0,
+                )
                 break
+
+            # Normal yielded event
+            yield result
+            await asyncio.sleep(0)
 
     except Exception as e:
         logger.exception("Error in streaming analysis")
